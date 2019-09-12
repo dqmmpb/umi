@@ -46,8 +46,12 @@ class TaskManager {
    * 获取全部 task 的状态
    */
   public async getTasksState() {
+    const res = {};
     const currentProjectTasks = this.tasks[this.currentCwd];
-    return Object.keys(currentProjectTasks).map(type => currentProjectTasks[type].getDetail());
+    Object.keys(currentProjectTasks).forEach(type => {
+      res[type] = currentProjectTasks[type].getDetail();
+    });
+    return res;
   }
 
   public getTaskDetail(type: TaskType): ITaskDetail {

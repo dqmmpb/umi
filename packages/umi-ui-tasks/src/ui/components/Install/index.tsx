@@ -5,50 +5,27 @@ import { IUiApi } from 'umi-types';
 import withSize from 'react-sizeme';
 import styles from '../../ui.module.less';
 import { TaskType, TaskState } from '../../../server/core/enums';
-import { exec, cancel, isCaredEvent, getTerminalIns, TriggerState, clearLog } from '../../util';
+import { ITaskDetail } from '../../../server/core/types';
+import { getTerminalIns, clearLog } from '../../util';
+import { namespace } from '../../model';
 
-import { useTaskDetail } from '../../hooks';
 import Terminal from '../Terminal';
 
 interface IProps {
   api: IUiApi;
-  state?: TaskState;
+  detail: ITaskDetail;
+  dispatch: any;
 }
 
 const { SizeMe } = withSize;
 const taskType = TaskType.INSTALL;
 const { Option } = Select;
 
-const InstallComponent: React.FC<IProps> = ({ api }) => {
+const InstallComponent: React.FC<IProps> = ({ api, dispatch, detail = {} }) => {
   const { intl } = api;
-  const [taskDetail, setTaskDetail] = useState({ state: TaskState.INIT, type: taskType, log: '' });
   const [npmClients, setNpmClients] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [form] = Form.useForm();
-
-  // Mount: 获取 task detail
-  const { detail } = useTaskDetail(taskType);
-  // Mount: 监听 task state 改变
-  useEffect(
-    () => {
-      setTaskDetail(detail as any);
-      const unsubscribe = api.listenRemote({
-        type: 'org.umi.task.state',
-        onMessage: ({ detail: result, taskType: type }) => {
-          if (!isCaredEvent(type, taskType)) {
-            return null;
-          }
-          if (result) {
-            setTaskDetail(result);
-          }
-        },
-      });
-      return () => {
-        unsubscribe && unsubscribe();
-      };
-    },
-    [detail],
-  );
 
   useEffect(() => {
     (async () => {
@@ -72,26 +49,24 @@ const InstallComponent: React.FC<IProps> = ({ api }) => {
   }, []);
 
   async function install(npmClient) {
-    const { triggerState, errMsg } = await exec(taskType, {
-      NPM_CLIENT: npmClient,
+    dispatch({
+      type: `${namespace}/exec`,
+      payload: {
+        taskType,
+        env: {
+          NPM_CLIENT: npmClient,
+        },
+      },
     });
-    if (triggerState === TriggerState.FAIL) {
-      api.notify({
-        type: 'error',
-        title: intl({ id: 'org.umi.ui.tasks.install.execError' }),
-        message: errMsg,
-      });
-    }
   }
 
   async function cancelInstall() {
-    const { triggerState, errMsg } = await cancel(taskType);
-    if (triggerState === TriggerState.FAIL) {
-      api.notify({
-        title: intl({ id: 'org.umi.ui.tasks.install.cancelError' }),
-        message: errMsg,
-      });
-    }
+    dispatch({
+      type: `${namespace}/cancel`,
+      payload: {
+        taskType,
+      },
+    });
   }
 
   const openModal = () => {
@@ -112,7 +87,7 @@ const InstallComponent: React.FC<IProps> = ({ api }) => {
     setModalVisible(false);
   };
 
-  const isTaskRunning = taskDetail && taskDetail.state === TaskState.ING;
+  const isTaskRunning = detail && detail.state === TaskState.ING;
   return (
     <>
       <h1 className={styles.title}>{intl({ id: 'org.umi.ui.tasks.install' })}</h1>
@@ -175,7 +150,7 @@ const InstallComponent: React.FC<IProps> = ({ api }) => {
                 api={api}
                 size={size}
                 terminal={getTerminalIns(taskType)}
-                log={taskDetail.log}
+                log={detail.log}
                 onClear={() => {
                   clearLog(taskType);
                 }}

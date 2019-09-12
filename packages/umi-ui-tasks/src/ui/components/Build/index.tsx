@@ -5,24 +5,23 @@ import { IUiApi } from 'umi-types';
 import withSize from 'react-sizeme';
 import styles from '../../ui.module.less';
 import { TaskType, TaskState } from '../../../server/core/enums';
-import { exec, cancel, isCaredEvent, getTerminalIns, TriggerState, clearLog } from '../../util';
-import { useTaskDetail } from '../../hooks';
+import { getTerminalIns, clearLog } from '../../util';
+import { namespace } from '../../model';
 import Terminal from '../Terminal';
 import { ITaskDetail } from '../../../server/core/types';
 
 interface IProps {
-  detail: ITaskDetail;
   api: IUiApi;
-  state?: TaskState;
+  detail: ITaskDetail;
+  dispatch: any;
 }
 
 const { SizeMe } = withSize;
 const taskType = TaskType.BUILD;
 
-const BuildComponent: React.FC<IProps> = ({ api }) => {
+const BuildComponent: React.FC<IProps> = ({ api, detail = {}, dispatch }) => {
   const { intl } = api;
   const isEnglish = api.getLocale() === 'en-US';
-  const [taskDetail, setTaskDetail] = useState({ state: TaskState.INIT, type: taskType, log: '' });
   const [form] = Form.useForm();
   const [modalVisible, setModalVisible] = useState(false);
   const [env, setEnv] = useState({
@@ -34,31 +33,6 @@ const BuildComponent: React.FC<IProps> = ({ api }) => {
     FORK_TS_CHECKER: false,
   });
 
-  // Mount: 获取 task detail
-  const { detail } = useTaskDetail(taskType);
-
-  // Mount: 监听 task state 改变
-  useEffect(
-    () => {
-      setTaskDetail(detail as any);
-      const unsubscribe = api.listenRemote({
-        type: 'org.umi.task.state',
-        onMessage: ({ detail: result, taskType: type }) => {
-          if (!isCaredEvent(type, taskType)) {
-            return null;
-          }
-          if (result) {
-            setTaskDetail(result);
-          }
-        },
-      });
-      return () => {
-        unsubscribe && unsubscribe();
-      };
-    },
-    [detail],
-  );
-
   // UnMount: reset form
   useEffect(() => {
     return () => {
@@ -69,25 +43,22 @@ const BuildComponent: React.FC<IProps> = ({ api }) => {
   }, []);
 
   async function build() {
-    const { triggerState, errMsg } = await exec(taskType, env);
-    if (triggerState === TriggerState.FAIL) {
-      api.notify({
-        type: 'error',
-        title: `${api.currentProject.name} ${intl({ id: 'org.umi.ui.tasks.build.buildError' })}`,
-        message: errMsg,
-      });
-    }
+    dispatch({
+      type: `${namespace}/exec`,
+      payload: {
+        taskType,
+        env,
+      },
+    });
   }
 
   async function cancelBuild() {
-    const { triggerState, errMsg } = await cancel(taskType);
-    if (triggerState === TriggerState.FAIL) {
-      api.notify({
-        title: `${api.currentProject.name} ${intl({ id: 'org.umi.ui.tasks.build.cancelError' })}`,
-        message: errMsg,
-      });
-      return;
-    }
+    dispatch({
+      type: `${namespace}/cancel`,
+      payload: {
+        taskType,
+      },
+    });
   }
 
   const openModal = () => {
@@ -132,7 +103,7 @@ const BuildComponent: React.FC<IProps> = ({ api }) => {
     </div>
   );
 
-  const isTaskRunning = taskDetail && taskDetail.state === TaskState.ING;
+  const isTaskRunning = detail.state === TaskState.ING;
   return (
     <>
       <h1 className={styles.title}>{intl({ id: 'org.umi.ui.tasks.build' })}</h1>
@@ -262,7 +233,7 @@ const BuildComponent: React.FC<IProps> = ({ api }) => {
                 api={api}
                 size={size}
                 terminal={getTerminalIns(taskType)}
-                log={taskDetail.log}
+                log={detail.log}
                 onClear={() => {
                   clearLog(taskType);
                 }}

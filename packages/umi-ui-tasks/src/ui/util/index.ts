@@ -72,11 +72,17 @@ export function getNoticeMessage(
 }
 
 let callRemote;
+let listenRemote;
+let notify;
+let intl;
 export function initApiToGloal(api: IUiApi) {
   callRemote = api.callRemote; // eslint-disable-line
+  listenRemote = api.listenRemote;
+  notify = api.notify;
+  intl = api.intl;
 }
 
-export { callRemote };
+export { callRemote, listenRemote, notify, intl };
 
 export * from './task';
 export * from './terminal';

@@ -5,22 +5,24 @@ import { IUiApi } from 'umi-types';
 import withSize from 'react-sizeme';
 import styles from '../../ui.module.less';
 import { TaskType, TaskState } from '../../../server/core/enums';
-import { exec, cancel, isCaredEvent, getTerminalIns, TriggerState, clearLog } from '../../util';
-import { useTaskDetail } from '../../hooks';
+import { getTerminalIns, clearLog } from '../../util';
 import Terminal from '../Terminal';
+import { ITaskDetail } from '../../../server/core/types';
+import { namespace } from '../../model';
 
 interface IProps {
   api: IUiApi;
-  state?: TaskState;
+  detail: ITaskDetail;
+  dispatch: any;
 }
 
 const { SizeMe } = withSize;
 const taskType = TaskType.DEV;
 
-const DevComponent: React.FC<IProps> = ({ api }) => {
+const DevComponent: React.FC<IProps> = ({ api, detail = {}, dispatch }) => {
   const { intl } = api;
   const isEnglish = api.getLocale() === 'en-US';
-  const [taskDetail, setTaskDetail] = useState({ state: TaskState.INIT, type: taskType, log: '' });
+  // const [taskDetail, setTaskDetail] = useState({ state: TaskState.INIT, type: taskType, log: '' });
   const [form] = Form.useForm();
   const [modalVisible, setModalVisible] = useState(false);
   const [env, setEnv] = useState({
@@ -34,63 +36,32 @@ const DevComponent: React.FC<IProps> = ({ api }) => {
     FORK_TS_CHECKER: false,
   });
 
-  // Mount: 获取 task detail
-  const { detail } = useTaskDetail(taskType);
-  useEffect(
-    () => {
-      setTaskDetail(detail as any);
-    },
-    [detail],
-  );
-
-  // Mount: 监听 task state 改变
-  useEffect(
-    () => {
-      const unsubscribe = api.listenRemote({
-        type: 'org.umi.task.state',
-        onMessage: ({ detail: result, taskType: type }) => {
-          if (!isCaredEvent(type, taskType)) {
-            return null;
-          }
-          if (result) {
-            setTaskDetail(result);
-          }
-        },
-      });
-      return () => {
-        unsubscribe && unsubscribe();
-      };
-    },
-    [detail],
-  );
   // UnMount: reset form
   useEffect(() => {
     return () => {
       form.resetFields();
-      const terminal = getTerminalIns(taskType);
-      terminal && terminal.clear();
+      // const terminal = getTerminalIns(taskType);
+      // terminal && terminal.clear();
     };
   }, []);
 
   async function dev() {
-    const { triggerState, errMsg } = await exec(taskType, env);
-    if (triggerState === TriggerState.FAIL) {
-      api.notify({
-        type: 'error',
-        title: intl({ id: 'org.umi.ui.tasks.dev.startError' }),
-        message: errMsg,
-      });
-    }
+    dispatch({
+      type: `${namespace}/exec`,
+      payload: {
+        taskType,
+        env,
+      },
+    });
   }
 
   async function cancelDev() {
-    const { triggerState, errMsg } = await cancel(taskType);
-    if (triggerState === TriggerState.FAIL) {
-      api.notify({
-        title: intl({ id: 'org.umi.ui.tasks.dev.cancelError' }),
-        message: errMsg,
-      });
-    }
+    dispatch({
+      type: `${namespace}/cancel`,
+      payload: {
+        taskType,
+      },
+    });
   }
 
   const openModal = () => {
@@ -133,8 +104,7 @@ const DevComponent: React.FC<IProps> = ({ api }) => {
     </div>
   );
 
-  const isTaskRunning =
-    taskDetail && [TaskState.ING, TaskState.SUCCESS].indexOf(taskDetail.state) > -1;
+  const isTaskRunning = detail && [TaskState.ING, TaskState.SUCCESS].indexOf(detail.state) > -1;
   const outputRunningInfo = ({ state, localUrl }) => {
     if (!state || state === TaskState.INIT) {
       return null;
@@ -197,7 +167,7 @@ const DevComponent: React.FC<IProps> = ({ api }) => {
               )}
             </Button>
             <Button onClick={openModal}>{intl({ id: 'org.umi.ui.tasks.envs' })}</Button>
-            {outputRunningInfo(taskDetail)}
+            {outputRunningInfo(detail)}
             <Modal
               visible={modalVisible}
               title={intl({ id: 'org.umi.ui.tasks.envs' })}
@@ -317,7 +287,7 @@ const DevComponent: React.FC<IProps> = ({ api }) => {
                 api={api}
                 size={size}
                 terminal={getTerminalIns(taskType)}
-                log={taskDetail.log}
+                // log={taskDetail.log}
                 onClear={() => {
                   clearLog(taskType);
                 }}

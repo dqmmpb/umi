@@ -12,6 +12,7 @@ export interface ITasks {
 export interface ITaskDetail {
   type: TaskType;
   state: TaskState;
+  log?: string;
 }
 
 export interface ICollectorData {

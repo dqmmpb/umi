@@ -9,9 +9,12 @@ export default (api: IApi) => {
       case 'plugin/init':
         (async () => {
           await taskManger.init(api.cwd, send);
+          const states = await taskManger.getTasksState();
           send({
             type: `${type}/success`,
-            payload: {},
+            payload: {
+              states,
+            },
           });
         })();
         break;
